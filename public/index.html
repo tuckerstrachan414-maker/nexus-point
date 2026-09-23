@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nexus Point</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/vendor/codemirror/codemirror.min.css">
+<link rel="stylesheet" href="/vendor/codemirror/material-darker.min.css">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <span id="logo"><i data-icon="sparkles"></i>Nexus Point</span>
+    <select id="project-select"><option value="">Select a project</option></select>
+    <button class="ibtn" id="tree-refresh" title="Refresh files (F5)"><i data-icon="refresh"></i></button>
+    <span id="file-label"></span>
+    <span id="dirty-dot" hidden title="Unsaved changes">&#9679;</span>
+    <button id="save-btn" class="btn primary sm" disabled>Save</button>
+    <span id="status"></span>
+    <span class="spacer"></span>
+    <button class="ibtn" id="export-btn" title="Download this project as a zip" hidden><i data-icon="download"></i></button>
+    <button class="ibtn active" id="toggle-files" title="Toggle file panel (Ctrl+B)"><i data-icon="panelLeft"></i></button>
+    <button class="ibtn active" id="toggle-claude" title="Toggle Claude panel (Ctrl+J)"><i data-icon="panelRight"></i></button>
+  </header>
+  <div id="main">
+    <aside id="sidebar">
+      <div id="tree-tools">
+        <div class="search-wrap"><i data-icon="search"></i><input id="tree-filter" placeholder="Filter files" spellcheck="false"></div>
+        <button class="ibtn" id="find-files-btn" title="Find in files (Ctrl+Shift+F)"><i data-icon="fileCode"></i></button>
+        <button class="ibtn" id="new-file-btn" title="New file"><i data-icon="filePlus"></i></button>
+      </div>
+      <div id="find-files-bar" hidden>
+        <input id="find-files-q" placeholder="Find in files, Enter to search" spellcheck="false">
+        <button class="ibtn" id="find-files-close" title="Close"><i data-icon="x"></i></button>
+      </div>
+      <div id="tree" class="empty-hint">Pick a project above to browse its files.</div>
+      <div id="search-results" hidden></div>
+    </aside>
+    <div class="resizer" id="resize-left"></div>
+    <section id="editor-pane">
+      <div id="center-tabs">
+        <button class="tab active" data-tab="code">Code</button>
+        <button class="tab" data-tab="preview">Play</button>
+        <button class="tab" data-tab="assets">Assets</button>
+        <button class="tab" data-tab="pixel">Pixel</button>
+        <button class="tab" data-tab="design">Design</button>
+        <button class="tab" data-tab="run">Run</button>
+        <span class="spacer"></span>
+        <span id="preview-controls" hidden>
+          <button class="btn sm" id="preview-refresh" title="Reload the game"><i data-icon="refresh"></i>Restart</button>
+          <button class="btn sm" id="preview-console-toggle" title="Show or hide the game's console"><i data-icon="terminal"></i>Console <span id="console-count" class="pill" hidden>0</span></button>
+          <button class="btn sm" id="scene-edit" title="Click things in the running project and edit them"><i data-icon="pointer"></i>Edit</button>
+          <a class="btn sm" id="preview-newtab" href="#" target="_blank" title="Open in its own tab"><i data-icon="external"></i>Open</a>
+        </span>
+      </div>
+      <div id="code-pane">
+        <div id="file-tabs" hidden></div>
+        <div id="find-bar" hidden>
+          <input id="find-q" placeholder="Find" spellcheck="false">
+          <input id="find-r" placeholder="Replace" spellcheck="false">
+          <span id="find-count" class="dim"></span>
+          <button class="ibtn sm" id="find-prev" title="Previous (Shift+Enter)"><i data-icon="chevronUp"></i></button>
+          <button class="ibtn sm" id="find-next" title="Next (Enter)"><i data-icon="chevronDown"></i></button>
+          <button class="btn sm" id="find-replace">Replace</button>
+          <button class="btn sm" id="find-replace-all">All</button>
+          <button class="ibtn sm" id="find-close" title="Close (Esc)"><i data-icon="x"></i></button>
+        </div>
+        <div id="editor-host">
+          <div id="editor-placeholder">
+            <h2>Nexus Point</h2>
+            <p>Pick a project in the top bar, then open a file, press Play, or ask Claude.</p>
+            <div class="kbd-hints">
+              <span><kbd>Ctrl</kbd>+<kbd>P</kbd> find a file</span>
+              <span><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> find in files</span>
+              <span><kbd>Ctrl</kbd>+<kbd>J</kbd> focus Claude</span>
+              <span><kbd>Ctrl</kbd>+<kbd>K</kbd> send selection to Claude</span>
+            </div>
+          </div>
+          <textarea id="editor" hidden></textarea>
+        </div>
+      </div>
+      <div id="preview-pane" hidden>
+        <div id="preview-stage">
+          <iframe id="preview-frame" title="Play-test preview"></iframe>
+          <div id="scene-overlay" hidden></div>
+          <aside id="scene-panel" hidden>
+            <div id="scene-panel-bar">
+              <span id="scene-mode" class="pill">DOM</span>
+              <span class="spacer"></span>
+              <button class="ibtn sm" id="scene-freeze" title="Freeze the page while editing, so a repainting HUD cannot wipe a preview"><i data-icon="snowflake"></i></button>
+              <button class="ibtn sm" id="scene-exit" title="Leave edit mode"><i data-icon="x"></i></button>
+            </div>
+            <div id="scene-crumbs"></div>
+            <div id="scene-body"><div class="scene-hint">Click anything in the page to the left.</div></div>
+            <div id="scene-actions">
+              <button class="btn primary sm" id="scene-save" disabled title="Write the pending changes into the project's files">Save to file</button>
+              <button class="btn sm" id="scene-revert" disabled title="Drop the unsaved changes">Revert</button>
+            </div>
+          </aside>
+        </div>
+        <div id="play-console" hidden>
+          <div id="play-console-bar">
+            <span class="dim">Console</span>
+            <span class="spacer"></span>
+            <button class="btn sm accent" id="console-fix" hidden><i data-icon="sparkles"></i>Fix with Claude</button>
+            <button class="btn sm" id="console-clear">Clear</button>
+            <button class="ibtn sm" id="console-close" title="Hide"><i data-icon="x"></i></button>
+          </div>
+          <div id="play-console-log"></div>
+        </div>
+      </div>
+      <div id="assets-pane" hidden>
+        <div id="assets-toolbar">
+          <div class="search-wrap"><i data-icon="search"></i><input id="assets-filter" placeholder="Filter assets" spellcheck="false"></div>
+          <span class="spacer"></span>
+          <span id="assets-count" class="dim"></span>
+          <button class="btn sm" id="assets-new"><i data-icon="plus"></i>New image</button>
+          <button class="btn sm" id="assets-upload"><i data-icon="upload"></i>Upload</button>
+          <input type="file" id="assets-file" multiple accept="image/*,audio/*" hidden>
+        </div>
+        <div id="assets-grid"></div>
+      </div>
+      <div id="pixel-pane" hidden>
+        <div id="px-menubar">
+          <span id="px-menus"></span>
+          <span class="spacer"></span>
+          <span id="pixel-file" class="dim"></span>
+          <span id="pixel-status"></span>
+          <button class="btn sm" id="pixel-look" title="Send the selection to Claude"><i data-icon="selectRect"></i><span class="lbl">Ask about this</span></button>
+          <button class="btn sm" id="pixel-ask" title="Ask Claude to apply this frame's change to the sheet's other frames"><i data-icon="sparkles"></i>Apply to frames</button>
+          <button class="btn primary sm" id="pixel-save" title="Save PNG (Ctrl+S)"><i data-icon="save"></i>Save</button>
+        </div>
+        <div id="px-options"></div>
+        <div id="px-body">
+          <div id="px-tools"></div>
+          <div id="pixel-stage">
+            <canvas id="pixel-canvas"></canvas>
+            <div id="pixel-hint">
+              <p>Open a PNG from the <b>Assets</b> tab, or use <b>File &rsaquo; New</b> to start a sprite.</p>
+              <p class="dim">Wheel zooms. Space-drag or middle-drag pans. Alt-click picks a colour. Shift+click focuses one cell of a sheet.</p>
+            </div>
+          </div>
+          <div id="px-dock">
+            <div id="px-dock-tabs">
+              <button class="dtab active" data-dock="color">Colour</button>
+              <button class="dtab" data-dock="layers">Layers</button>
+              <button class="dtab" data-dock="frames">Frames</button>
+            </div>
+            <div id="px-dock-color" class="dock-panel"></div>
+            <div id="px-dock-layers" class="dock-panel" hidden></div>
+            <div id="px-dock-frames" class="dock-panel" hidden></div>
+          </div>
+        </div>
+        <div id="px-statusbar">
+          <span id="px-pos"></span>
+          <span id="px-colorinfo"></span>
+          <span id="px-selinfo"></span>
+          <span class="spacer"></span>
+          <span id="px-layerinfo"></span>
+          <span id="pixel-zoomlbl"></span>
+        </div>
+      </div>
+      <div id="design-pane" hidden>
+        <div id="dz-bar">
+          <span id="dz-menus"></span>
+          <span class="spacer"></span>
+          <span id="dz-file" class="dim"></span>
+          <span id="dz-status"></span>
+          <button class="btn sm" id="dz-png" title="Rasterise this to a PNG beside it, for a canvas game to load"><i data-icon="image"></i>Export PNG</button>
+          <button class="btn sm" id="dz-ask" title="Send this drawing to Claude"><i data-icon="sparkles"></i>Ask Claude</button>
+          <button class="btn primary sm" id="dz-save" title="Save the SVG (Ctrl+S)"><i data-icon="save"></i>Save</button>
+        </div>
+        <div id="dz-body">
+          <div id="dz-tools"></div>
+          <div id="dz-stage">
+            <div id="dz-canvas"></div>
+            <div id="dz-hint">
+              <p>Open an <b>.svg</b> from the <b>Assets</b> tab, or use <b>File &rsaquo; New</b> to start a drawing.</p>
+              <p class="dim">This is the editor for art that is not pixel art. Wheel zooms, space-drag pans. The Pixel tab still owns every .png.</p>
+            </div>
+          </div>
+          <div id="dz-dock">
+            <div id="dz-props"></div>
+            <div id="dz-layers"></div>
+          </div>
+        </div>
+        <div id="dz-statusbar">
+          <span id="dz-pos"></span>
+          <span id="dz-selinfo"></span>
+          <span class="spacer"></span>
+          <span id="dz-size"></span>
+          <span id="dz-zoom"></span>
+        </div>
+      </div>
+      <div id="run-pane" hidden>
+        <div id="run-toolbar">
+          <button class="btn sm run-quick" data-cmd="git status --short --branch"><i data-icon="git"></i>status</button>
+          <button class="btn sm run-quick" id="run-commit"><i data-icon="check"></i>Commit all</button>
+          <button class="btn sm run-quick" data-cmd="git push"><i data-icon="upload"></i>push</button>
+          <button class="btn sm run-quick" data-cmd="git log --oneline -15">log</button>
+          <button class="btn sm run-quick" data-cmd="node --version">node</button>
+          <span class="spacer"></span>
+          <button class="btn sm accent" id="run-fix" hidden><i data-icon="sparkles"></i>Fix with Claude</button>
+          <button class="btn sm" id="run-clear">Clear</button>
+        </div>
+        <pre id="run-output">Commands run inside the open project folder. 60-second limit, so not for dev servers.</pre>
+        <div id="run-input-row">
+          <span class="prompt-glyph">&rsaquo;</span>
+          <input id="run-cmd" placeholder="Command (Up and Down recall history)" spellcheck="false">
+          <button id="run-go" class="btn primary sm">Run</button>
+        </div>
+      </div>
+    </section>
+    <div class="resizer" id="resize-right"></div>
+    <aside id="claude-panel">
+      <div id="claude-header">
+        <span id="claude-status" class="idle" title="Claude status"></span>
+        <span id="claude-title">Claude</span>
+        <button id="chat-title" class="btn ghost sm" title="Rename this chat" hidden></button>
+        <span class="spacer"></span>
+        <button class="ibtn" id="new-chat-btn" title="New chat (runs alongside this one)"><i data-icon="plus"></i></button>
+        <button class="ibtn" id="history-btn" title="Past chats"><i data-icon="history"></i></button>
+        <button class="ibtn" id="claude-menu-btn" title="More"><i data-icon="more"></i></button>
+      </div>
+      <div id="chat-tabs" hidden></div>
+      <div id="todo-panel" hidden></div>
+      <div id="chat-log"></div>
+      <template id="chat-empty-tpl">
+        <div class="chat-empty">
+          <div class="empty-title"><i data-icon="sparkles" data-size="20"></i>What are we building?</div>
+          <p class="dim">Claude sees the open project, can read and edit its files, run commands, and draw pixels. Ask in plain English.</p>
+          <div class="quick-actions"></div>
+        </div>
+      </template>
+      <div id="history-drawer" hidden>
+        <div class="drawer-bar">
+          <button class="ibtn" id="history-back" hidden title="Back"><i data-icon="chevronLeft"></i></button>
+          <span id="history-drawer-title">Past chats</span>
+          <span class="spacer"></span>
+          <button class="btn sm primary" id="history-resume" hidden title="Load this conversation back into Claude's context">Resume</button>
+          <button class="ibtn" id="history-close" title="Close"><i data-icon="x"></i></button>
+        </div>
+        <div class="search-wrap slim" id="history-search"><i data-icon="search"></i><input id="history-filter" placeholder="Search chats" spellcheck="false"></div>
+        <div id="history-list"></div>
+        <div id="history-transcript" hidden></div>
+      </div>
+      <div id="settings-drawer" hidden>
+        <div class="drawer-bar"><span>Claude settings</span><span class="spacer"></span><button class="ibtn" id="settings-close" title="Close"><i data-icon="x"></i></button></div>
+        <div class="drawer-body">
+          <label for="extra-prompt">Extra instructions <span class="dim">(appended to the system prompt)</span></label>
+          <textarea id="extra-prompt" rows="4" placeholder="e.g. Always explain changes in plain English before making them."></textarea>
+          <label>Tools that run without asking</label>
+          <div id="auto-allow"></div>
+          <label>Account</label>
+          <div id="account-info" class="dim">Loading</div>
+          <label>MCP servers</label>
+          <div id="mcp-info" class="dim">Loading</div>
+          <div class="row"><button class="btn primary sm" id="settings-save">Save</button><span class="dim">Prompt changes restart the chat.</span></div>
+        </div>
+      </div>
+      <div id="composer">
+        <div id="notice-row" hidden></div>
+        <div id="suggestion-row" hidden></div>
+        <div id="attach-row" hidden></div>
+        <div id="cmd-menu" hidden></div>
+        <div id="chat-input-wrap">
+          <textarea id="chat-input" rows="1" placeholder="Ask Claude.  / commands,  @ files,  paste images"></textarea>
+          <button class="ibtn" id="attach-btn" title="Attach the open file, a project file, or an image"><i data-icon="paperclip"></i></button>
+          <button id="chat-send" class="ibtn primary" title="Send (Enter)"><i data-icon="arrowUp"></i></button>
+          <button id="chat-stop" class="ibtn danger" title="Stop Claude (Esc)" hidden><i data-icon="stop"></i></button>
+        </div>
+        <div id="composer-status">
+          <button class="chip" id="model-btn" title="Model"><i data-icon="cpu"></i><span>Model</span></button>
+          <button class="chip" id="mode-btn" title="Permission mode. Shift+Tab cycles."><i data-icon="shield"></i><span>Manual</span></button>
+          <button class="chip" id="effort-btn" title="Reasoning effort"><i data-icon="gauge"></i><span>Medium</span></button>
+          <span class="spacer"></span>
+          <button class="chip" id="usage-btn" title="Context window and session usage"><span id="usage-text">0%</span></button>
+        </div>
+        <div id="usage-bar"><div id="usage-fill"></div></div>
+      </div>
+    </aside>
+  </div>
+  <div id="popover" hidden></div>
+  <div id="ctx-menu" hidden></div>
+  <div id="modal-host" hidden></div>
+  <div id="toast-host"></div>
+  <input type="file" id="attach-file" accept="image/*" hidden>
+</div>
+<script src="/vendor/codemirror/codemirror.min.js"></script>
+<script src="/vendor/codemirror/mode/xml.min.js"></script>
+<script src="/vendor/codemirror/mode/css.min.js"></script>
+<script src="/vendor/codemirror/mode/javascript.min.js"></script>
+<script src="/vendor/codemirror/mode/htmlmixed.min.js"></script>
+<script src="/vendor/codemirror/mode/markdown.min.js"></script>
+<script src="/vendor/codemirror/mode/python.min.js"></script>
+<script src="/icons.js"></script>
+<script src="/ui.js"></script>
+<script src="/app.js"></script>
+<script src="/chat.js"></script>
+<script src="/pixel.js"></script>
+<script src="/tabs.js"></script>
+<script src="/scene.js"></script>
+<script src="/design.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "model": "default",
+  "extraPrompt": "",
+  "mode": "auto",
+  "effort": "high",
+  "autoAllow": [
+    "Read",
+    "Glob",
+    "Grep",
+    "TodoWrite",
+    "WebSearch",
+    "WebFetch",
+    "Task",
+    "TaskOutput",
+    "ListMcpResourcesTool",
+    "ReadMcpResourceTool",
+    "Bash",
+    "Edit",
+    "Write",
+    "mcp__nexus__screen",
+    "Skill",
+    "mcp__nexus__screen_displays",
+    "NotebookEdit",
+    "MultiEdit"
+  ]
+}
